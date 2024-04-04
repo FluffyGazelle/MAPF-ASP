@@ -13,7 +13,7 @@ class Graphs():
 
     def parse_output(self, sol, num_agents):
         sol = sol.splitlines()[::-1]
-        #print(sol)
+        print(sol)
         max_plan_length = total_plan_length = 0
 
         if "UNSATISFIABLE" in sol:
@@ -57,7 +57,10 @@ class Graphs():
                         item = item.replace("planLength(","").replace(")","") 
                         parts = item.split(",")
                         agent = int(parts[0])
-                        length = int(parts[1])
+                        if parts[1] == "#inf":
+                            length = 0
+                        else:
+                            length = int(parts[1])
                         
                         planLengths[agent] = length
                 #print(planLengths)
@@ -81,6 +84,7 @@ class Graphs():
         print("Solving MAPF for subproblem...")
         sol= sp.Popen(cmd_list, stdout=sp.PIPE, stderr = sp.PIPE, encoding = 'utf8').communicate()[0]
         return sol
+    
     """
     Problem 1: GRAPH PARTITIONING
     """
@@ -96,13 +100,13 @@ class Graphs():
             G.nodes[node]['cluster'] = labels[i]
         
         
-    
+        """
         color_map = [f'C{G.nodes[node]["cluster"]}' for node in G.nodes()]
         plt.figure(figsize=(20, 20))
         nx.draw(G, pos=positions, node_color=color_map, with_labels=True, node_size= 100, font_weight='bold')
         plt.title('Graph Partitioning')
         plt.show()
-        
+        """
         subgraphs = []
         
         for cluster_id in range(k):
@@ -143,14 +147,16 @@ class Graphs():
                                 # Add both nodes and the edge to H_i_prime, if not already present
                                 if not H_i_prime.has_node(u): 
                                     j_cluster_val = H_j.nodes[u]['cluster']
-                                    H_i_prime.add_node(u, cluster= [cluster_val, j_cluster_val])
+                                    i_cluster_val = H_i.nodes[v]['cluster']
+                                    H_i_prime.add_node(u, cluster= [i_cluster_val, j_cluster_val])    #OKAY YOU F***ED UP HERE
                                     #print("added node", u)
                                     #print(H_i_prime.nodes[u]['cluster'])
                                     
                                 if not H_i_prime.has_node(v): 
                                     j_cluster_val = H_j.nodes[v]['cluster']
+                                    i_cluster_val = H_i.nodes[u]['cluster']
 
-                                    H_i_prime.add_node(v,  cluster= [cluster_val, j_cluster_val])
+                                    H_i_prime.add_node(v,  cluster= [i_cluster_val, j_cluster_val])     #AAAAAAAA YOU F***ED UP HERE TOO
                                     #print("added node", v)
                                     #print(H_i_prime.nodes[v]['cluster'])
 
@@ -249,20 +255,11 @@ if __name__ == "__main__":
         Agents.append(paired_numbers)
     
     print("agents:",Agents)
-    n = 4 # Number of clusters
-    grid_size = (8, 8) 
+    n = 2 # Number of clusters
+    grid_size = (4, 8) 
     makespan_limit = 5
     G = nx.grid_2d_graph(*grid_size)
-    """
-    #if the pickle file is not available, create it
-    if not os.path.exists(f"graph{grid_size}.gpickle"):
-        G = nx.grid_2d_graph(*grid_size)
-        nx.write_gpickle(G, f"graph{grid_size}.gpickle")
-    else:
-        print("Loading graph from pickle file")
-        G = nx.read_gpickle(f"graph{grid_size}.gpickle")
-    
-    """
+
     
     positions = {node: (node[0], node[1]) for node in G.nodes()}
 
@@ -274,7 +271,7 @@ if __name__ == "__main__":
     modified_subgraphs = Graphs().subgraph_intersecting(G, subgraphs)
     subgraph_colors = [f'C{i}' for i in range(len(modified_subgraphs))]
 
-    
+    """
     
     for i, subgraph in enumerate(subgraphs):
         plt.figure(figsize=(5, 5))
@@ -289,6 +286,7 @@ if __name__ == "__main__":
         plt.title(f'Modified Subgraph {i+1}')
 
     plt.show()
+    """
     
     # Generate the abstract graph with color
     G_A_with_colors, node_capacities , edge_capacities = Graphs.abstract_graph_representation(modified_subgraphs, subgraph_colors)
@@ -298,7 +296,7 @@ if __name__ == "__main__":
     pos=nx.circular_layout(G_A_with_colors)
     pos=nx.spring_layout(G_A_with_colors,dim=2,pos=pos)
 
-    
+    """
     plt.figure(figsize=(10, 10))
     nx.draw(G_A_with_colors,
             with_labels=True,
@@ -309,8 +307,9 @@ if __name__ == "__main__":
     plt.title("Abstract Graph Representation with Subgraph Colors")
     plt.show()
     
+    """
     
-    # Generationg the mapf instance files
+    # Generating the mapf instance files
     for i, mod_sub in enumerate(modified_subgraphs):
         node_value_list = []    
         for node in mod_sub.nodes():
@@ -323,13 +322,11 @@ if __name__ == "__main__":
         
         edge_value_list = []    
         for node1, node2 in mod_sub.edges():
-            print(node1, node2)
             key1 = [k for k, v in value_to_coord.items() if v == node1][0]
 
             key2 = [k for k, v in value_to_coord.items() if v == node2][0]
 
             edge_str = str(key1)+", "+str(key2)
-            print(edge_str)
             
             reverse_edge_str = str(key2)+", "+str(key1)
             edge_value_list.append(edge_str)
@@ -337,7 +334,8 @@ if __name__ == "__main__":
             formatted_string = ".".join([f"edge({num})" for num in edge_value_list])
         with open(f"subgraph_{mod_sub.graph['label']}.lp", "a") as file:
             file.write(formatted_string+".\n")
-        print("edge_value_list", edge_value_list)
+            
+            
     abs_nodes = G_A_with_colors.nodes()
     abs_nodes_list = []
     for node in abs_nodes:
@@ -382,6 +380,7 @@ if __name__ == "__main__":
 
 
     sol = Graphs.run_clingo_for_abstract_problem()
+    print(sol)
     solution, plan_lengths, opts = Graphs().parse_output(sol, len(A_A))
     print(plan_lengths)
     print("solution",solution)
@@ -431,25 +430,28 @@ if __name__ == "__main__":
                     A_s[agent_key] = (init_goal_pos_for_agent_for_subproblem)
 
             print("A_s", A_s)
-            A_s_STR =Graphs.subproblem_agents_to_str(A_s, grid_size)
-            output_path = f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp"
-            with open(output_path, 'w') as file:
-                file.write(A_s_STR)
-            print("A_s_STR\n")
-            s_sol = Graphs.run_clingo_for_subproblem(f"subgraph_{H_i_prime.graph['label']}.lp", f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp")
-            print("A_s_STR\n")
+            if not A_s == {}:
+                A_s_STR =Graphs.subproblem_agents_to_str(A_s, grid_size)
+                
+                output_path = f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp"
+                with open(output_path, 'w') as file:
+                    file.write(A_s_STR)
+                print("A_s_STR\n")
+                
+                s_sol = Graphs.run_clingo_for_subproblem(f"subgraph_{H_i_prime.graph['label']}.lp", f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp")
+                print("A_s_STR\n")
 
-            s_solution, s_plan_lengths, s_opts = Graphs().parse_output(s_sol, len(A_A))
-            if s_solution == "UNSATISFIABLE":
-                print("No solution found for the given instance!")
-                sys.exit(0)
-            print("sılution:", s_solution)
-            last_elements = {key: value_to_coord[values[max(values.keys())]] for key, values in s_solution.items()}
-            
-            print("last_elements", last_elements)
-            last_positions.update(last_elements)
-            print("last positions",abstract_step, last_positions,"\n")
-            planStep.append(s_solution)
+                s_solution, s_plan_lengths, s_opts = Graphs().parse_output(s_sol, len(A_A))
+                if s_solution == "UNSATISFIABLE":
+                    print("No solution found for the given instance!")
+                    sys.exit(0)
+                print("sılution:", s_solution)
+                last_elements = {key: value_to_coord[values[max(values.keys())]] for key, values in s_solution.items()}
+                
+                print("last_elements", last_elements)
+                last_positions.update(last_elements)
+                print("last positions",abstract_step, last_positions,"\n")
+                planStep.append(s_solution)
         #print(planStep)
         PLANS.update({abstract_step: planStep})
     print("longest_abstract_plan", longest_abstract_plan)
@@ -474,4 +476,9 @@ if __name__ == "__main__":
     for agent_id, plan in combined_plans.items():
         print(f"\nAgent {agent_id} plan:")
         print(plan)
+        for agent_id_to_compare, plan_to_compare in combined_plans.items():
+            if agent_id > agent_id_to_compare:
+                for step, position in plan.items():
+                    if step in plan_to_compare and plan_to_compare[step] == position:
+                        print(f"Conflict at step {step} between agents {agent_id} and {agent_id_to_compare}")
     
