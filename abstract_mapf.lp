@@ -32,6 +32,9 @@ plan_to(X, Y, T, A) :- plan(A, T-1, X), plan(A, T, Y), edge(X, Y), time(T), agen
 :- C{ plan_to(X, Y, T, A) ; plan_to(Y, X, T, A) : agent(A) }, edge(X, Y), edge_cap(X, Y, C-1), time(T).
 
 
+% Assign a unique door to each agent at each timestep   
+1{ assigned_door(A, T-1, L) : door(edge(X, Y), L) } 1 :- agent(A), plan(A, T-1, X), plan(A, T, Y), time(T),X != Y. 
+
 % display the resulting plans
 #show plan/3.
-#show agent/1.
+#show assigned_door/3.

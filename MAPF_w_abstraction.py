@@ -6,8 +6,7 @@ import sys
 import numpy as np
 from sklearn.cluster import KMeans
 import networkx as nx
-from scipy.linalg import eigh
-
+import os
 
 class Graphs():
 
@@ -21,7 +20,7 @@ class Graphs():
 
         plans = dict()
         planLengths = dict()
-
+        doors = {}
         cpu_found = opt_found = plan_found = False
         for line in sol:
             if "CPU" in line and not cpu_found:
@@ -51,6 +50,8 @@ class Graphs():
                         pos = int(parts[2])
                         if agent not in plans:  # Initialize if not already present
                             plans[agent] = {}
+                            doors[agent] = {}
+
                         plans[agent][time] = pos
 
                     elif "planLength(" in item:
@@ -63,13 +64,22 @@ class Graphs():
                             length = int(parts[1])
                         
                         planLengths[agent] = length
+                    
+                    elif "assigned_door(" in item:
+                        item = item.replace("assigned_door(","").replace(")","")
+                        parts = item.split(",")
+                        print(parts)
+                        agent = int(parts[0])
+                        time = int(parts[1])
+                        door = int(parts[2])
+                        doors[agent][time] = door
                 #print(planLengths)
                 #print("plans", plans)
                 plan_found = True
             
             if cpu_found and opt_found and plan_found:
                 #print(plans)
-                return plans, planLengths, [max_plan_length, total_plan_length, cpu_time]
+                return plans, planLengths, doors, [max_plan_length, total_plan_length, cpu_time]
     
     def run_clingo_for_abstract_problem():
         cmd_list = ["clingo", "Abstract_Graph.lp", "Abstract_Agents.lp", "abstract_mapf.lp", "optimizations.lp"]
@@ -190,7 +200,7 @@ class Graphs():
                 if H_i_prime.graph['label'] < H_j_prime.graph['label']:  
                     intersection = set(H_i_prime.nodes()) & set(H_j_prime.nodes())
                     if intersection:
-                        G_A.add_edge(H_i_prime.graph['label'], H_j_prime.graph['label'], weight=len(intersection)) 
+                        G_A.add_edge(H_i_prime.graph['label'], H_j_prime.graph['label'], weight=len(intersection), doors = intersection) 
                     edge_weights = nx.get_edge_attributes(G_A, 'weight')
         return G_A, node_sizes, edge_weights
 
@@ -231,18 +241,23 @@ class Graphs():
             print("initial_pos", initial_pos)
             key = next((k for k, v in value_to_coord.items() if v == initial_pos), None)
             output_lines.append(f"init({agent},{key}).")
-            
+            print("GOALL",goals)
             # Convert each goal position
-            for goal_pos in goals:
-                print("goal_pos", goal_pos)
-                goal_value = [k for k, v in value_to_coord.items() if v == goal_pos][0]
-                output_lines.append(f"goal({agent},{goal_value}).")
+            output_lines.append(f"goal({agent},{goals}).")
 
         return "\n".join(output_lines)
 
 
 if __name__ == "__main__":
-    
+    fileName = "output" + ".txt"
+    # create log folder
+    folderName = "log"
+    os.makedirs(folderName, exist_ok=True)
+    # open file
+    file_path = os.path.join(folderName, fileName)
+    logFile = open(file_path, "w")
+    sys.stdout = logFile
+    sys.stderr = logFile
     #READ AGENTS FROM FILE
     with open("16x16_agents/5_agents/5_agents_1.txt", "r") as file:
         agents = file.read()
@@ -290,7 +305,7 @@ if __name__ == "__main__":
     
     # Generate the abstract graph with color
     G_A_with_colors, node_capacities , edge_capacities = Graphs.abstract_graph_representation(modified_subgraphs, subgraph_colors)
-    
+
     A_A = Graphs.abstract_agent_positioning(Agents, subgraphs)
     print("abstract agents:", A_A)
     pos=nx.circular_layout(G_A_with_colors)
@@ -345,19 +360,30 @@ if __name__ == "__main__":
         file.write(f"#const t = {makespan_limit}.\ntime(0..t).\n")
         file.write(formatted_string+".\n")
         
-    abs_edges = G_A_with_colors.edges()
+    abs_edges = G_A_with_colors.edges(data=True)
     edge_value_list = []
-    for node1, node2 in abs_edges:
+    for node1, node2, attr in abs_edges:
         edge_str = str(node1)+", "+str(node2)
         reverse_edge_str = str(node2)+", "+str(node1)
 
         edge_value_list.append(edge_str)
         edge_value_list.append(reverse_edge_str)
         
+        doors = attr.get("doors")
+        abstract_graph_doors_list = list()
+        for door in doors:
+            key = next((k for k, v in value_to_coord.items() if v == door), None)
+            abstract_graph_doors_list.append(key)
+        doors_formatted_string = ""
+        for edge in edge_value_list:
+            input_str = f"door(edge({edge})"
+            print(input_str)
+            doors_formatted_string += ".".join([f"{input_str},{num})" for num in abstract_graph_doors_list]) + ".\n"
+            print("a", doors_formatted_string)
+        print("b",doors_formatted_string)
         formatted_string = ".".join([f"edge({num})" for num in edge_value_list])
     with open(f"Abstract_Graph.lp", "a") as file:
-        file.write(formatted_string+".\n")
-    
+        file.write(doors_formatted_string + formatted_string+".\n")    
     formatted_string = ".".join([f"node_cap({key}, {value})" for key, value in node_capacities.items()])
     with open("Abstract_Graph.lp", "a") as file:
         file.write(formatted_string+".\n")
@@ -381,7 +407,8 @@ if __name__ == "__main__":
 
     sol = Graphs.run_clingo_for_abstract_problem()
     print(sol)
-    solution, plan_lengths, opts = Graphs().parse_output(sol, len(A_A))
+    solution, plan_lengths, doors_for_plans, opts = Graphs().parse_output(sol, len(A_A))
+    print("doors",doors_for_plans)
     print(plan_lengths)
     print("solution",solution)
     if solution == "UNSATISFIABLE":
@@ -413,6 +440,7 @@ if __name__ == "__main__":
                     subproblem_goal_pos = []
                     print("agent", agent_key, agent_value)
                     subproblem_initial_pos = last_positions[agent_key]
+                    #i if 
                     if agent_value[1] in H_i_prime.nodes():
 
                         subproblem_goal_pos.append(agent_value[1])
@@ -425,7 +453,23 @@ if __name__ == "__main__":
                         print("intersections", intersections)
                         for node in intersections:
                             subproblem_goal_pos.append(node)
-                    init_goal_pos_for_agent_for_subproblem = (subproblem_initial_pos, subproblem_goal_pos)
+                    print("subproblem goal positions",subproblem_goal_pos),
+                        
+                    try:
+                        doors_for_plans[agent_key][abstract_step]
+                    except:
+                        for node in H_i_prime:
+                            print("node iiiis", node)
+                            print(H_i_prime.nodes[node]['cluster'])
+                            print([H_i_prime.graph['label']])
+                            if H_i_prime.nodes[node]['cluster'] == [H_i_prime.graph['label']]: #TODO: add another condition s.t. the node is not selected as a goal node already
+                                break
+                        print("agent key", agent_key,"abs",abstract_step)
+                        
+                        node = [k for k, v in value_to_coord.items() if v == node][0]
+                        doors_for_plans[agent_key][abstract_step] = node
+                        
+                    init_goal_pos_for_agent_for_subproblem = (subproblem_initial_pos, doors_for_plans[agent_key][abstract_step] )
                     print(init_goal_pos_for_agent_for_subproblem)
                     A_s[agent_key] = (init_goal_pos_for_agent_for_subproblem)
 
@@ -440,12 +484,13 @@ if __name__ == "__main__":
                 
                 s_sol = Graphs.run_clingo_for_subproblem(f"subgraph_{H_i_prime.graph['label']}.lp", f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp")
                 print("A_s_STR\n")
-
-                s_solution, s_plan_lengths, s_opts = Graphs().parse_output(s_sol, len(A_A))
+                print(s_sol)
+                s_solution, s_plan_lengths, nvm, s_opts = Graphs().parse_output(s_sol, len(A_A))
+                print(s_solution)
                 if s_solution == "UNSATISFIABLE":
                     print("No solution found for the given instance!")
                     sys.exit(0)
-                print("sılution:", s_solution)
+                print("slution:", s_solution)
                 last_elements = {key: value_to_coord[values[max(values.keys())]] for key, values in s_solution.items()}
                 
                 print("last_elements", last_elements)
