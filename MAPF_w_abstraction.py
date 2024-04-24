@@ -16,7 +16,7 @@ class Graphs():
         max_plan_length = total_plan_length = 0
 
         if "UNSATISFIABLE" in sol:
-            return "UNSATISFIABLE", 0, []
+            return "UNSATISFIABLE", 0,0, []
 
         plans = dict()
         planLengths = dict()
@@ -441,35 +441,33 @@ if __name__ == "__main__":
                     print("agent", agent_key, agent_value)
                     subproblem_initial_pos = last_positions[agent_key]
                     #i if 
+                    print("ACTUALLY WTF")
                     if agent_value[1] in H_i_prime.nodes():
-
-                        subproblem_goal_pos.append(agent_value[1])
+                        print("yay agent goal in subgraph",agent_value[1])
+                        subproblem_goal_pos.append([k for k, v in value_to_coord.items() if v == agent_value[1]][0])
                     else:
-                        for mod_subg in modified_subgraphs:
-                            if solution[agent_key][abstract_step+1] == mod_subg.graph['label']:
-                                G_prime = mod_subg
-                                break
-                        intersections = set(G_prime.nodes()).intersection(set(H_i_prime.nodes()))
-                        print("intersections", intersections)
-                        for node in intersections:
-                            subproblem_goal_pos.append(node)
-                    print("subproblem goal positions",subproblem_goal_pos),
+                        try:
+                            doors_for_plans[agent_key][abstract_step]
+                            subproblem_goal_pos.append(doors_for_plans[agent_key][abstract_step])
+                        except:
+                            for node in H_i_prime:
+                                print("node iiiis", node)
+                                print(H_i_prime.nodes[node]['cluster'])
+                                print([H_i_prime.graph['label']])
+                                if H_i_prime.nodes[node]['cluster'] == [H_i_prime.graph['label']]: #TODO: add another condition s.t. the node is not selected as a goal node already
+                                    print("OMG YAY")
+                                    break
+                            print("agent key", agent_key,"abs",abstract_step)
+                            print(node)
+                            node = [k for k, v in value_to_coord.items() if v == node][0]
+                            print(node)
+                            doors_for_plans[agent_key][abstract_step] = node
+                            subproblem_goal_pos.append(doors_for_plans[agent_key][abstract_step])
+                    print("subproblem goal positions",subproblem_goal_pos)
                         
-                    try:
-                        doors_for_plans[agent_key][abstract_step]
-                    except:
-                        for node in H_i_prime:
-                            print("node iiiis", node)
-                            print(H_i_prime.nodes[node]['cluster'])
-                            print([H_i_prime.graph['label']])
-                            if H_i_prime.nodes[node]['cluster'] == [H_i_prime.graph['label']]: #TODO: add another condition s.t. the node is not selected as a goal node already
-                                break
-                        print("agent key", agent_key,"abs",abstract_step)
+
                         
-                        node = [k for k, v in value_to_coord.items() if v == node][0]
-                        doors_for_plans[agent_key][abstract_step] = node
-                        
-                    init_goal_pos_for_agent_for_subproblem = (subproblem_initial_pos, doors_for_plans[agent_key][abstract_step] )
+                    init_goal_pos_for_agent_for_subproblem = (subproblem_initial_pos,subproblem_goal_pos[0])
                     print(init_goal_pos_for_agent_for_subproblem)
                     A_s[agent_key] = (init_goal_pos_for_agent_for_subproblem)
 

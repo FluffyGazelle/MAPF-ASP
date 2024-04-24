@@ -20,8 +20,8 @@ edge(Y, X) :- edge(X, Y).
 % no two agents are at the same vertex at time T.
 :- plan(A1,T,X), plan(A2,T,X), agent(A1;A2), A1<A2.
 
-% if there is an obstacle at time T at vertex X, no path can visit X.
-:- plan(A,T,X), obstacle(X,T), agent(A), time(T).
+% if there is an obstacle at vertex X, no path can visit X.
+:- plan(A,T,X), obstacle(X), agent(A), time(T).
 
 % if there exists a plan to X, an edge between X-Y and X is goal, there cannot be a plan to Y => there is no outgoing edge from goal.
 :- plan(A,T,X), plan(A,T+1,Y), edge(X,Y), goal(A,X), agent(A), time(T).
