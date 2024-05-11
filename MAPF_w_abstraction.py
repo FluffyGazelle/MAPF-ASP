@@ -153,7 +153,12 @@ class Graphs():
                     for j, H_j in enumerate(subgraphs):
                         if j < i:
                             if (u in H_j.nodes() and v in H_i.nodes()) or (v in H_j.nodes() and u in H_i.nodes()):                                
-                                    
+                                
+                                for H_j_prime in modified_subgraphs:
+                                    sub_label = H_j_prime.graph['label'] if 'label' in H_j_prime.graph else None
+                                    if H_j.graph['label'] == sub_label:
+                                        break
+                                
                                 # Add both nodes and the edge to H_i_prime, if not already present
                                 if not H_i_prime.has_node(u): 
                                     j_cluster_val = H_j.nodes[u]['cluster']
@@ -234,7 +239,7 @@ class Graphs():
         # Write agents
         for agent in A_s.keys():
             output_lines.append(f"agent({agent}).")
-
+        output_lines.append(f"\n")
         # Write initial positions and goals
         for agent, (initial_pos, goals) in A_s.items():
             # Convert initial position
@@ -242,13 +247,97 @@ class Graphs():
             key = next((k for k, v in value_to_coord.items() if v == initial_pos), None)
             output_lines.append(f"init({agent},{key}).")
             print("GOALL",goals)
+            
             # Convert each goal position
-            output_lines.append(f"goal({agent},{goals}).")
+            for goal in goals:
+                output_lines.append(f"goal({agent},{goal}).")
+            output_lines.append(f"\n")
 
-        return "\n".join(output_lines)
+        return "".join(output_lines)
 
+
+    def generate_lp_files(self, modified_subgraphs, G_A_with_colors, node_capacities, edge_capacities, A_A, value_to_coord, makespan_limit):
+        for i, mod_sub in enumerate(modified_subgraphs):
+            node_value_list = []    
+            for node in mod_sub.nodes():
+                key = next((k for k, v in value_to_coord.items() if v == node), None)
+                node_value_list.append(key)
+                
+            formatted_string = ".".join([f"vertex({num})" for num in node_value_list])
+            with open(f"subgraph_{mod_sub.graph['label']}.lp", "w") as file:
+                file.write(formatted_string+".\n")
+            
+            edge_value_list = []    
+            for node1, node2 in mod_sub.edges():
+                key1 = [k for k, v in value_to_coord.items() if v == node1][0]
+
+                key2 = [k for k, v in value_to_coord.items() if v == node2][0]
+
+                edge_str = str(key1)+", "+str(key2)
+                
+                reverse_edge_str = str(key2)+", "+str(key1)
+                edge_value_list.append(edge_str)
+                edge_value_list.append(reverse_edge_str)
+                formatted_string = ".".join([f"edge({num})" for num in edge_value_list])
+            with open(f"subgraph_{mod_sub.graph['label']}.lp", "a") as file:
+                file.write(formatted_string+".\n")
+                
+                
+        abs_nodes = G_A_with_colors.nodes()
+        abs_nodes_list = []
+        for node in abs_nodes:
+            abs_nodes_list.append(node)
+        formatted_string = ".".join([f"vertex({num})" for num in abs_nodes_list])
+        with open(f"Abstract_Graph.lp", "w") as file:
+            file.write(f"#const t = {makespan_limit}.\ntime(0..t).\n")
+            file.write(formatted_string+".\n")
+            
+        abs_edges = G_A_with_colors.edges(data=True)
+        edge_value_list = []
+        for node1, node2, attr in abs_edges:
+            edge_str = str(node1)+", "+str(node2)
+            reverse_edge_str = str(node2)+", "+str(node1)
+
+            edge_value_list.append(edge_str)
+            edge_value_list.append(reverse_edge_str)
+            
+            doors = attr.get("doors")
+            abstract_graph_doors_list = list()
+            for door in doors:
+                key = next((k for k, v in value_to_coord.items() if v == door), None)
+                abstract_graph_doors_list.append(key)
+            doors_formatted_string = ""
+            for edge in edge_value_list:
+                input_str = f"door(edge({edge})"
+                print(input_str)
+                doors_formatted_string += ".".join([f"{input_str},{num})" for num in abstract_graph_doors_list]) + ".\n"
+                print("a", doors_formatted_string)
+            print("b",doors_formatted_string)
+            formatted_string = ".".join([f"edge({num})" for num in edge_value_list])
+        with open(f"Abstract_Graph.lp", "a") as file:
+            file.write(doors_formatted_string + formatted_string+".\n")    
+        formatted_string = ".".join([f"node_cap({key}, {value})" for key, value in node_capacities.items()])
+        with open("Abstract_Graph.lp", "a") as file:
+            file.write(formatted_string+".\n")
+            
+        formatted_string = ".".join([f"edge_cap({key[0]}, {key[1]}, {value})" for key, value in edge_capacities.items()])
+        with open("Abstract_Graph.lp", "a") as file:
+            file.write(formatted_string+".\n")
+            
+            
+        formatted_string = ".".join([f"agent({num})" for num in range(len(A_A))])
+        with open(f"Abstract_Agents.lp", "w") as file:
+            file.write(formatted_string+".\n\n")
+            for idx, (init, goal) in enumerate(A_A):
+                
+                file.write(f"init({idx},{init}).")
+                
+                file.write(f"goal({idx},{goal}).\n")
+
+        
 
 if __name__ == "__main__":
+    
     fileName = "output" + ".txt"
     # create log folder
     folderName = "log"
@@ -263,11 +352,13 @@ if __name__ == "__main__":
         agents = file.read()
         agents_list = agents.split("\n")
         
+        
     Agents = []
     for agent in agents_list:
         numbers_list = list(map(int, agent.split()))  # Convert each number to an integertegerr   
         paired_numbers = ((numbers_list[0], numbers_list[1]), (numbers_list[2], numbers_list[3]))
         Agents.append(paired_numbers)
+    
     
     print("agents:",Agents)
     n = 2 # Number of clusters
@@ -279,6 +370,7 @@ if __name__ == "__main__":
     positions = {node: (node[0], node[1]) for node in G.nodes()}
 
     value_to_coord = {(initx * max(grid_size)) + inity: (initx, inity) for initx, inity in G.nodes()}
+    coord_to_value = {coord: value for value, coord in value_to_coord.items()}
 
     
     subgraphs = Graphs.graph_partitioning(G, n)
@@ -325,85 +417,7 @@ if __name__ == "__main__":
     """
     
     # Generating the mapf instance files
-    for i, mod_sub in enumerate(modified_subgraphs):
-        node_value_list = []    
-        for node in mod_sub.nodes():
-            key = next((k for k, v in value_to_coord.items() if v == node), None)
-
-            node_value_list.append(key)
-        formatted_string = ".".join([f"vertex({num})" for num in node_value_list])
-        with open(f"subgraph_{mod_sub.graph['label']}.lp", "w") as file:
-            file.write(formatted_string+".\n")
-        
-        edge_value_list = []    
-        for node1, node2 in mod_sub.edges():
-            key1 = [k for k, v in value_to_coord.items() if v == node1][0]
-
-            key2 = [k for k, v in value_to_coord.items() if v == node2][0]
-
-            edge_str = str(key1)+", "+str(key2)
-            
-            reverse_edge_str = str(key2)+", "+str(key1)
-            edge_value_list.append(edge_str)
-            edge_value_list.append(reverse_edge_str)
-            formatted_string = ".".join([f"edge({num})" for num in edge_value_list])
-        with open(f"subgraph_{mod_sub.graph['label']}.lp", "a") as file:
-            file.write(formatted_string+".\n")
-            
-            
-    abs_nodes = G_A_with_colors.nodes()
-    abs_nodes_list = []
-    for node in abs_nodes:
-        abs_nodes_list.append(node)
-    formatted_string = ".".join([f"vertex({num})" for num in abs_nodes_list])
-    with open(f"Abstract_Graph.lp", "w") as file:
-        file.write(f"#const t = {makespan_limit}.\ntime(0..t).\n")
-        file.write(formatted_string+".\n")
-        
-    abs_edges = G_A_with_colors.edges(data=True)
-    edge_value_list = []
-    for node1, node2, attr in abs_edges:
-        edge_str = str(node1)+", "+str(node2)
-        reverse_edge_str = str(node2)+", "+str(node1)
-
-        edge_value_list.append(edge_str)
-        edge_value_list.append(reverse_edge_str)
-        
-        doors = attr.get("doors")
-        abstract_graph_doors_list = list()
-        for door in doors:
-            key = next((k for k, v in value_to_coord.items() if v == door), None)
-            abstract_graph_doors_list.append(key)
-        doors_formatted_string = ""
-        for edge in edge_value_list:
-            input_str = f"door(edge({edge})"
-            print(input_str)
-            doors_formatted_string += ".".join([f"{input_str},{num})" for num in abstract_graph_doors_list]) + ".\n"
-            print("a", doors_formatted_string)
-        print("b",doors_formatted_string)
-        formatted_string = ".".join([f"edge({num})" for num in edge_value_list])
-    with open(f"Abstract_Graph.lp", "a") as file:
-        file.write(doors_formatted_string + formatted_string+".\n")    
-    formatted_string = ".".join([f"node_cap({key}, {value})" for key, value in node_capacities.items()])
-    with open("Abstract_Graph.lp", "a") as file:
-        file.write(formatted_string+".\n")
-        
-    formatted_string = ".".join([f"edge_cap({key[0]}, {key[1]}, {value})" for key, value in edge_capacities.items()])
-    with open("Abstract_Graph.lp", "a") as file:
-        file.write(formatted_string+".\n")
-        
-        
-    formatted_string = ".".join([f"agent({num})" for num in range(len(A_A))])
-    with open(f"Abstract_Agents.lp", "w") as file:
-        file.write(formatted_string+".\n\n")
-        for idx, (init, goal) in enumerate(A_A):
-            
-            file.write(f"init({idx},{init}).")
-            
-            file.write(f"goal({idx},{goal}).\n")
-
-    
-
+    Graphs().generate_lp_files(modified_subgraphs, G_A_with_colors, node_capacities, edge_capacities, A_A, value_to_coord, makespan_limit)
 
     sol = Graphs.run_clingo_for_abstract_problem()
     print(sol)
@@ -425,6 +439,9 @@ if __name__ == "__main__":
         print("\n\n\n\n\n\nabstract_step", abstract_step)
         print("Agents_dict", Agents_dict)
         print("last_positions", last_positions)
+        all_doors_used_in_step  = {agent: doors[abstract_step] for agent, doors in doors_for_plans.items() if abstract_step in doors}
+        cannot_be_goal_nodes = set(all_doors_used_in_step.values())
+        print("cannot_be_goal_nodes", cannot_be_goal_nodes)
         planStep = []
         for H_i_prime in modified_subgraphs:
             #print("h prime nodes: ",H_i_prime.nodes())
@@ -434,54 +451,52 @@ if __name__ == "__main__":
                 print("agent", agent_key, agent_value)
                 print(solution)
                 print("agent_solution", solution[agent_key], abstract_step)
-                if solution[agent_key][abstract_step] == H_i_prime.graph['label']:
+                
+                if solution[agent_key][abstract_step] == H_i_prime.graph['label']: #the agent is in the subgraph, add it to the subproblem containing the subgraph
                     print("subgraph label",H_i_prime.graph['label'])
                     
                     subproblem_goal_pos = []
                     print("agent", agent_key, agent_value)
                     subproblem_initial_pos = last_positions[agent_key]
-                    #i if 
-                    print("ACTUALLY WTF")
-                    if agent_value[1] in H_i_prime.nodes():
+                                 
+                    if agent_value[1] in H_i_prime.nodes(): #the agent goal is in the subgraph
                         print("yay agent goal in subgraph",agent_value[1])
                         subproblem_goal_pos.append([k for k, v in value_to_coord.items() if v == agent_value[1]][0])
-                    else:
-                        try:
-                            doors_for_plans[agent_key][abstract_step]
+                    
+                    else: #the agent goal is not in the subgraph
+                        
+                        if agent_key in doors_for_plans and abstract_step in doors_for_plans[agent_key]: #the door is assigned and the agent will move to another subgraph
                             subproblem_goal_pos.append(doors_for_plans[agent_key][abstract_step])
-                        except:
-                            for node in H_i_prime:
-                                print("node iiiis", node)
-                                print(H_i_prime.nodes[node]['cluster'])
-                                print([H_i_prime.graph['label']])
-                                if H_i_prime.nodes[node]['cluster'] == [H_i_prime.graph['label']]: #TODO: add another condition s.t. the node is not selected as a goal node already
-                                    print("OMG YAY")
+                            
+                        else: #the door is not assigned and the agent will stay in the same subgraph
+                            for H_i in subgraphs:
+                                sub_label = H_i.graph['label'] if 'label' in H_i.graph else None
+                                if H_i_prime.graph['label'] == sub_label:
                                     break
-                            print("agent key", agent_key,"abs",abstract_step)
-                            print(node)
-                            node = [k for k, v in value_to_coord.items() if v == node][0]
-                            print(node)
-                            doors_for_plans[agent_key][abstract_step] = node
-                            subproblem_goal_pos.append(doors_for_plans[agent_key][abstract_step])
+                            
+                            filtered_nodes = [coord_to_value.get(node) for node in H_i.nodes() if coord_to_value.get(node) not in cannot_be_goal_nodes]
+                            print("filtered nodes",filtered_nodes)
+                            subproblem_goal_pos = subproblem_goal_pos + filtered_nodes
+                            
+                    
                     print("subproblem goal positions",subproblem_goal_pos)
                         
 
                         
-                    init_goal_pos_for_agent_for_subproblem = (subproblem_initial_pos,subproblem_goal_pos[0])
+                    init_goal_pos_for_agent_for_subproblem = (subproblem_initial_pos,subproblem_goal_pos)
                     print(init_goal_pos_for_agent_for_subproblem)
                     A_s[agent_key] = (init_goal_pos_for_agent_for_subproblem)
 
             print("A_s", A_s)
             if not A_s == {}:
                 A_s_STR =Graphs.subproblem_agents_to_str(A_s, grid_size)
-                
+                print("A_s_STR", A_s_STR)
                 output_path = f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp"
                 with open(output_path, 'w') as file:
                     file.write(A_s_STR)
-                print("A_s_STR\n")
                 
                 s_sol = Graphs.run_clingo_for_subproblem(f"subgraph_{H_i_prime.graph['label']}.lp", f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp")
-                print("A_s_STR\n")
+                
                 print(s_sol)
                 s_solution, s_plan_lengths, nvm, s_opts = Graphs().parse_output(s_sol, len(A_A))
                 print(s_solution)
