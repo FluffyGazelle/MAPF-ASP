@@ -21,7 +21,7 @@ edge(Y, X) :- edge(X, Y).
 :- plan(A1,T,X), plan(A2,T,X), agent(A1;A2), A1<A2.
 
 % if there is an obstacle at vertex X, no path can visit X.
-:- plan(A,T,X), obstacle(X), agent(A), time(T).
+:- plan(A,T,X), obstacle(X), agent(A), time(T), T > 0.
 
 % agent must be at its goal at the end of the plan.
 :- not goal(A,X), plan(A,t,X), agent(A).

@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 import networkx as nx
 import os
-
+import time
 class Graphs():
 
     def parse_abstract_output(self, sol, num_agents):
@@ -25,6 +25,7 @@ class Graphs():
         for line in sol:
             if "CPU" in line and not cpu_found:
                 l = line.split()
+                print("cpu line",l)
                 cpu_time = l[-1]    
                 cpu_found = True
                 
@@ -122,7 +123,7 @@ class Graphs():
                 return plans, cpu_time
     
     def run_clingo_for_abstract_problem():
-        cmd_list = ["clingo", "Abstract_Graph.lp", "Abstract_Agents.lp", "abstract_mapf.lp"]
+        cmd_list = ["clingo", "Abstract_Graph.lp", "Abstract_Agents.lp", "abstract_mapf.lp", "optimizations.lp"]
         print("Solving MAPF...")
         sol= sp.Popen(cmd_list, stdout=sp.PIPE, stderr = sp.PIPE, encoding = 'utf8').communicate()[0]
         return sol
@@ -282,9 +283,9 @@ class Graphs():
         
         return A_A
     
-    def subproblem_agents_to_str(A_s, grid_size):
+    def subproblem_agents_to_str(A_s, obstacles):
         output_lines = []
-
+        all_goals_in_subgraph = []
         # Write agents
         for agent in A_s.keys():
             output_lines.append(f"agent({agent}).")
@@ -300,9 +301,16 @@ class Graphs():
             
             # Convert each goal position
             for goal in goals:
+                all_goals_in_subgraph.append(goal)
                 output_lines.append(f"goal({agent},{goal}).")
             output_lines.append(f"\n")
-
+            
+        print("goals", goals)
+        for obstacle in obstacles:
+            print("the obs is ", obstacle)
+            if obstacle not in all_goals_in_subgraph: 
+                output_lines.append(f"obstacle({obstacle}).")
+            
         return "".join(output_lines)
 
 
@@ -394,7 +402,8 @@ class Graphs():
         
 
 if __name__ == "__main__":
-    
+    start_time = time.time()
+
     fileName = "output" + ".txt"
     # create log folder
     folderName = "log"
@@ -408,11 +417,11 @@ if __name__ == "__main__":
     print("Hi, starting the program...")
     
     n = 2 # Number of clusters
-    grid_size = (4, 8) 
+    grid_size = (16, 16) 
     makespan_limit = n
     G = nx.grid_2d_graph(*grid_size)
 
-    with open(f"{grid_size[0]}x{grid_size[1]}_agents/5_agents_1.txt", "r") as file:
+    with open(f"{grid_size[0]}x{grid_size[1]}_agents/15_agents_1.txt", "r") as file:
         agents = file.read()
         agents_list = agents.split("\n")
         
@@ -464,7 +473,7 @@ if __name__ == "__main__":
     pos=nx.circular_layout(G_A_with_colors)
     pos=nx.spring_layout(G_A_with_colors,dim=2,pos=pos)
 
-    
+    """ 
     plt.figure(figsize=(10, 10))
     nx.draw(G_A_with_colors,
             with_labels=True,
@@ -474,7 +483,7 @@ if __name__ == "__main__":
             font_weight='bold')
     plt.title("Abstract Graph Representation with Subgraph Colors")
     plt.show()
-
+    """
     
     
     # Generating the mapf instance files
@@ -483,7 +492,7 @@ if __name__ == "__main__":
     print("Running MAPF solver...")
     sol = Graphs.run_clingo_for_abstract_problem()
     print("sol",sol)
-    solution, plan_lengths, doors_for_plans, opts = Graphs().parse_abstract_output(sol, len(A_A))
+    solution, plan_lengths, doors_for_plans, abs_cpu_time = Graphs().parse_abstract_output(sol, len(A_A))
     print("doors",doors_for_plans)
     print(plan_lengths)
     print("solution",solution)
@@ -498,7 +507,7 @@ if __name__ == "__main__":
     PLANS = {}
     last_positions = {agent: Agents[agent][0] for agent in range(len(Agents))}
     
-
+    subproblem_cpu_times = []
     for abstract_step in range(longest_abstract_plan+1):
         print("\n\n\n\n\n\nabstract_step", abstract_step)
         print("Agents_dict", Agents_dict)
@@ -510,6 +519,10 @@ if __name__ == "__main__":
         for H_i_prime in modified_subgraphs:
             #print("h prime nodes: ",H_i_prime.nodes())
             A_s = {}
+            for H_i in subgraphs:
+                sub_label = H_i.graph['label'] if 'label' in H_i.graph else None
+                if H_i_prime.graph['label'] == sub_label:
+                    break
             for agent_key in Agents_dict.keys():
                 agent_value = Agents_dict[agent_key]
                 print(solution)
@@ -532,10 +545,6 @@ if __name__ == "__main__":
                             subproblem_goal_pos.append(doors_for_plans[agent_key][abstract_step])
                             
                         else: #the door is not assigned and the agent will stay in the same subgraph
-                            for H_i in subgraphs:
-                                sub_label = H_i.graph['label'] if 'label' in H_i.graph else None
-                                if H_i_prime.graph['label'] == sub_label:
-                                    break
                             
                             filtered_nodes = [coord_to_value.get(node) for node in H_i.nodes() if coord_to_value.get(node) not in cannot_be_goal_nodes]
                             print("filtered nodes",filtered_nodes)
@@ -546,16 +555,32 @@ if __name__ == "__main__":
                     print(init_goal_pos_for_agent_for_subproblem)
                     A_s[agent_key] = (init_goal_pos_for_agent_for_subproblem)
 
+            obstacles = [coord_to_value.get(node) for node in H_i_prime.nodes() if coord_to_value.get(node) in cannot_be_goal_nodes]
+            nodes_in_H_i_prime = set(H_i_prime.nodes())
+            nodes_in_H_i = set(H_i.nodes())
+
+            # Find the difference
+            nodes_only_in_H_i_prime = nodes_in_H_i_prime - nodes_in_H_i
+            print("nodes_in_H_i_prime",nodes_in_H_i_prime)
+            print("nodes_in_H_i",nodes_in_H_i)
+            # Convert the result to a list
+            nodes_only_in_H_i_prime_list = list(nodes_only_in_H_i_prime)
+            values_list = [coord_to_value[node] for node in nodes_only_in_H_i_prime if node in coord_to_value]
+            combined_list = values_list + obstacles
+            obstacles = list(set(combined_list))
+            print("nodes_only_in_H_i_prime",nodes_only_in_H_i_prime)
+            print("obs", values_list)
+            print("obstacles", obstacles)
             print("A_s", A_s)
             if not A_s == {}:
-                A_s_STR =Graphs.subproblem_agents_to_str(A_s, grid_size)
+                A_s_STR =Graphs.subproblem_agents_to_str(A_s, obstacles)
                 output_path = f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp"
                 with open(output_path, 'w') as file:
                     file.write(A_s_STR)
                 max_manhattan_distance = Graphs.get_max_manhattan_distance(H_i_prime)
-                with open("subproblem_limit.lp", "w") as file:
-                    file.write(f"#const t = {max_manhattan_distance}.\ntime(0..t).")
                 while True:
+                    with open("subproblem_limit.lp", "w") as file:
+                        file.write(f"#const t = {int(max_manhattan_distance*0.7)}.\ntime(0..t).")
                     s_sol = Graphs.run_clingo_for_subproblem(f"subgraph_{H_i_prime.graph['label']}.lp", f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp")
                     
                     print(s_sol)
@@ -564,6 +589,7 @@ if __name__ == "__main__":
                     if s_solution == "UNSATISFIABLE":
                         print("No solution found for the given instance!")
                         max_manhattan_distance += 1
+                        subproblem_cpu_times.append(cpu_time_for_subproblem)
                     else:
                         break
                 print("slution:", s_solution)
@@ -573,8 +599,21 @@ if __name__ == "__main__":
                 last_positions.update(last_elements)
                 print("last positions",abstract_step, last_positions,"\n")
                 planStep.append(s_solution)
-        #print(planStep)
-        PLANS.update({abstract_step: planStep})
+                
+        max_size = max(len(inner_dict) for outer_dict in planStep for inner_dict in outer_dict.values())
+
+        # Extend each inner dictionary to the maximum size with a default value (e.g., 0)
+        for outer_dict in planStep:
+            for key, inner_dict in outer_dict.items():
+                for i in range(max_size):
+                    if i not in inner_dict:
+                        inner_dict[i] = inner_dict[i-1]
+        print("planStep", planStep)
+        abs_step_plans = {abstract_step: planStep}
+
+
+        PLANS.update(abs_step_plans)
+        print("PLANS for the abss tep",abstract_step, PLANS)
     print("longest_abstract_plan", longest_abstract_plan)
 
     print(PLANS)
@@ -593,13 +632,34 @@ if __name__ == "__main__":
     for agent_id in combined_plans:
         combined_plans[agent_id] = {i: step for i, step in enumerate(combined_plans[agent_id])}
 
+    solution_valid = True
+    longest_plan_agent = None
+    max_length = 0
     #print("combined_plans", combined_plans)
     for agent_id, plan in combined_plans.items():
         print(f"\nAgent {agent_id} plan:")
         print(plan)
+        if len(plan) > max_length:
+            max_length = len(plan)
+            longest_plan_agent = agent_id
         for agent_id_to_compare, plan_to_compare in combined_plans.items():
             if agent_id > agent_id_to_compare:
                 for step, position in plan.items():
                     if step in plan_to_compare and plan_to_compare[step] == position:
+                        solution_valid = False
                         print(f"Conflict at step {step} between agents {agent_id} and {agent_id_to_compare}")
     
+    if solution_valid:
+        print("Solution is valid!")
+        
+    end_time = time.time()
+
+    # Calculate the total time taken
+    elapsed_time = end_time - start_time
+    total_subproblem_time = sum(float(t[:-1]) if isinstance(t, str) and t.endswith('s') else float(t) for t in subproblem_cpu_times)
+
+    print(f"The script took {elapsed_time:.2f} seconds to run.")
+    print(f"Abstract Problem solving time: {abs_cpu_time}")
+    print("Amount of subproblems solved:", len(subproblem_cpu_times))
+    print(f"Total subproblem solving time: {total_subproblem_time}s")
+    print("max makespan", max_length)

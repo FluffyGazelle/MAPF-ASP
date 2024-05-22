@@ -36,10 +36,10 @@ plan_to(X, Y, T, A) :- plan(A, T-1, X), plan(A, T, Y), edge(X, Y), time(T), agen
 :- assigned_door(A, T, L), assigned_door(B, T, L), agent(A), agent(B), A != B, time(T).
 
 % find the plan length for each agent
-planLength(A,L) :- #max{T: plan(A,T-1,Y), plan(A,T,X), goal(A,X), X!=Y}=L, agent(A).
+%planLength(A,L) :- #max{T: plan(A,T-1,Y), plan(A,T,X), goal(A,X), X!=Y}=L, agent(A).
 %:- plan(A,T,X), planLength(A,L), L < T.
 
 % display the resulting plans
 #show plan/3.
-#show planLength/2.
+%#show planLength/2.
 #show assigned_door/3.
