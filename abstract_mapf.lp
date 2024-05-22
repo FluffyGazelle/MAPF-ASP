@@ -21,8 +21,6 @@ plan(A,0,X) :- init(A,X), agent(A).
 %visit(A,X) :- plan(A,T,X).
 %:- waypoint(A,X), not visit(A,X).
 
-
-
 % in abstract graph, not more than C agents can visit a vertex at time T.
 :- C{plan(A,T,X):agent(A)}, vertex(X), time(T), node_cap(X, C-1).
 
@@ -37,6 +35,11 @@ plan_to(X, Y, T, A) :- plan(A, T-1, X), plan(A, T, Y), edge(X, Y), time(T), agen
 
 :- assigned_door(A, T, L), assigned_door(B, T, L), agent(A), agent(B), A != B, time(T).
 
+% find the plan length for each agent
+%planLength(A,L) :- #max{T: plan(A,T-1,Y), plan(A,T,X), goal(A,X), X!=Y}=L, agent(A).
+%:- plan(A,T,X), planLength(A,L), L < T.
+
 % display the resulting plans
 #show plan/3.
+%#show planLength/2.
 #show assigned_door/3.
