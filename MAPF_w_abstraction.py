@@ -415,7 +415,7 @@ if __name__ == "__main__":
     sys.stderr = logFile
     #READ AGENTS FROM FILE
     print("Hi, starting the program...")
-    
+    total_makespan_limit = 34
     n = 2 # Number of clusters
     grid_size = (16, 16) 
     makespan_limit = n
@@ -508,10 +508,13 @@ if __name__ == "__main__":
     last_positions = {agent: Agents[agent][0] for agent in range(len(Agents))}
     
     subproblem_cpu_times = []
+    curr_makespan = 0
+    
     for abstract_step in range(longest_abstract_plan+1):
         print("\n\n\n\n\n\nabstract_step", abstract_step)
         print("Agents_dict", Agents_dict)
         print("last_positions", last_positions)
+        makespan_for_step = 0
         all_doors_used_in_step  = {agent: doors[abstract_step] for agent, doors in doors_for_plans.items() if abstract_step in doors}
         cannot_be_goal_nodes = set(all_doors_used_in_step.values())
         print("cannot_be_goal_nodes", cannot_be_goal_nodes)
@@ -578,9 +581,10 @@ if __name__ == "__main__":
                 with open(output_path, 'w') as file:
                     file.write(A_s_STR)
                 max_manhattan_distance = Graphs.get_max_manhattan_distance(H_i_prime)
+                makespan_for_subproblem = int(max_manhattan_distance*0.7)
                 while True:
                     with open("subproblem_limit.lp", "w") as file:
-                        file.write(f"#const t = {int(max_manhattan_distance*0.7)}.\ntime(0..t).")
+                        file.write(f"#const t = {makespan_for_subproblem}.\ntime(0..t).")
                     s_sol = Graphs.run_clingo_for_subproblem(f"subgraph_{H_i_prime.graph['label']}.lp", f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp")
                     
                     print(s_sol)
@@ -588,9 +592,11 @@ if __name__ == "__main__":
                     print(s_solution)
                     if s_solution == "UNSATISFIABLE":
                         print("No solution found for the given instance!")
-                        max_manhattan_distance += 1
+                        makespan_for_subproblem += 1
                         subproblem_cpu_times.append(cpu_time_for_subproblem)
                     else:
+                        if makespan_for_step <= makespan_for_subproblem:
+                            makespan_for_step = makespan_for_subproblem
                         break
                 print("slution:", s_solution)
                 last_elements = {key: value_to_coord[values[max(values.keys())]] for key, values in s_solution.items()}
@@ -599,7 +605,12 @@ if __name__ == "__main__":
                 last_positions.update(last_elements)
                 print("last positions",abstract_step, last_positions,"\n")
                 planStep.append(s_solution)
-                
+        print("makespan_for_step",makespan_for_step)
+        curr_makespan += makespan_for_step
+        if curr_makespan > total_makespan_limit:
+            print("Total makespan limit exceeded")
+            print("No solution found for the given instance!")
+            sys.exit(0)        
         max_size = max(len(inner_dict) for outer_dict in planStep for inner_dict in outer_dict.values())
 
         # Extend each inner dictionary to the maximum size with a default value (e.g., 0)
