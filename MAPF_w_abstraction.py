@@ -123,7 +123,7 @@ class Graphs():
                 return plans, cpu_time
     
     def run_clingo_for_abstract_problem():
-        cmd_list = ["clingo", "Abstract_Graph.lp", "Abstract_Agents.lp", "abstract_mapf.lp", "optimizations.lp"]
+        cmd_list = ["clingo", "Abstract_Graph.lp", "Abstract_Agents.lp", "abstract_mapf.lp", "optimizations.lp","--time-limit=1000"]
         print("Solving MAPF...")
         sol= sp.Popen(cmd_list, stdout=sp.PIPE, stderr = sp.PIPE, encoding = 'utf8').communicate()[0]
         return sol
@@ -416,12 +416,12 @@ if __name__ == "__main__":
     #READ AGENTS FROM FILE
     print("Hi, starting the program...")
     total_makespan_limit = 34
-    n = 2 # Number of clusters
-    grid_size = (16, 16) 
+    n = 16 # Number of clusters
+    grid_size = (32, 32) 
     makespan_limit = n
     G = nx.grid_2d_graph(*grid_size)
 
-    with open(f"{grid_size[0]}x{grid_size[1]}_agents/15_agents_1.txt", "r") as file:
+    with open(f"{grid_size[0]}x{grid_size[1]}_agents/256_agents_1.txt", "r") as file:
         agents = file.read()
         agents_list = agents.split("\n")
         
@@ -580,7 +580,7 @@ if __name__ == "__main__":
                 output_path = f"subproblem_agents_for_step_{abstract_step}_subgraph_{H_i_prime.graph['label']}.lp"
                 with open(output_path, 'w') as file:
                     file.write(A_s_STR)
-                max_manhattan_distance = Graphs.get_max_manhattan_distance(H_i_prime)
+                max_manhattan_distance = Graphs.get_max_manhattan_distance(H_i_prime) #subgraphın max manhattan distance'ı, subproblem içindeki maksimum agent goal init farkı da olabilir
                 makespan_for_subproblem = int(max_manhattan_distance*0.7)
                 while True:
                     with open("subproblem_limit.lp", "w") as file:

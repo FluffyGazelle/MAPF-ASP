@@ -15,19 +15,19 @@ edge(Y, X) :- edge(X, Y).
 
 %%%TEST%%%
 % there exists an incoming edge to goal (to make sure the agent reaches its goal).
-:- {plan(A,T,Y):edge(X,Y),goal(A,Y)}0, agent(A).
+:- {plan(A,T,Y):edge(X,Y),goal(A,Y)}0, agent(A), time(T), T < 2.
 
 % no two agents are at the same vertex at time T.
-:- plan(A1,T,X), plan(A2,T,X), agent(A1;A2), A1<A2.
+:- plan(A1,T,X), plan(A2,T,X), agent(A1), agent(A2), A1<A2.
 
 % if there is an obstacle at vertex X, no path can visit X.
-:- plan(A,T,X), obstacle(X), agent(A), time(T), T > 0.
+:- plan(A,T,X), obstacle(X), agent(A), time(T), T > 1.
 
 % agent must be at its goal at the end of the plan.
 :- not goal(A,X), plan(A,t,X), agent(A).
 
 % no swapping
-:- plan(A1,T,X), plan(A1,T+1,Y), plan(A2,T,Y), plan(A2,T+1,X), agent(A1;A2), A1<A2, time(T), edge(X,Y).
+:- plan(A1,T,X), plan(A1,T+1,Y), plan(A2,T,Y), plan(A2,T+1,X), agent(A1), agent(A2), A1<A2, time(T), edge(X,Y).
 
 %visit(A,X) :- plan(A,T,X).
 %:- waypoint(A,X), not visit(A,X).
