@@ -15,7 +15,7 @@ edge(Y, X) :- edge(X, Y).
 
 %%%TEST%%%
 % there exists an incoming edge to goal (to make sure the agent reaches its goal).
-:- {plan(A,T,Y):edge(X,Y),goal(A,Y)}0, agent(A), time(T), T < 2.
+:- {plan(A,T,Y):edge(X,Y),goal(A,Y)}0, agent(A).
 
 % no two agents are at the same vertex at time T.
 :- plan(A1,T,X), plan(A2,T,X), agent(A1), agent(A2), A1<A2.
