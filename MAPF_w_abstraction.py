@@ -17,7 +17,13 @@ class Graphs():
         
 
         if "UNSATISFIABLE" in sol:
-            return "UNSATISFIABLE", 0, 0, 0
+            for line in sol:
+                if "CPU" in line and not cpu_found:
+                    l = line.split()
+                    print("cpu line",l)
+                    cpu_time = l[-1]
+                    break
+            return "UNSATISFIABLE", 0, 0, cpu_time
 
         plans = dict()
         planLengths = dict()
@@ -404,7 +410,7 @@ class Graphs():
 
 if __name__ == "__main__":
     start_time = time.time()
-
+    debug = False
     fileName = "output" + ".txt"
     # create log folder
     folderName = "log"
@@ -416,27 +422,29 @@ if __name__ == "__main__":
     sys.stderr = logFile
     #READ AGENTS FROM FILE
     print("Hi, starting the program...")
-    #total_makespan_limit = 34
-    #n = 16 # Number of clusters
-    #grid_size = (32, 32) 
-    #makespan_limit = n
-    #G = nx.grid_2d_graph(*grid_size)
-    """
-    with open(f"{grid_size[0]}x{grid_size[1]}_agents/256_agents_1.txt", "r") as file:
-        agents = file.read()
-        agents_list = agents.split("\n")
+    if debug == True:
+        total_makespan_limit = 34
+        n = 4 # Number of clusters
+        grid_size = (8, 8) 
+        makespan_limit = n
+        G = nx.grid_2d_graph(*grid_size)
         
-    Agents = []
-    for agent in agents_list:
-        numbers_list = list(map(int, agent.split()))  # Convert each number to an integertegerr   
-        paired_numbers = ((numbers_list[0], numbers_list[1]), (numbers_list[2], numbers_list[3]))
-        Agents.append(paired_numbers) 
-    print("agents:",Agents)       
-    print("Generated the grid graph")
-    """
+        with open(f"4x{grid_size[1]}_agents/5_agents_1.txt", "r") as file:
+            agents = file.read()
+            agents_list = agents.split("\n")
+            
+        Agents = []
+        for agent in agents_list:
+            numbers_list = list(map(int, agent.split()))  # Convert each number to an integertegerr   
+            paired_numbers = ((numbers_list[0], numbers_list[1]), (numbers_list[2], numbers_list[3]))
+            Agents.append(paired_numbers) 
+        print("agents:",Agents)       
+        print("Generated the grid graph")
     
-    grid_height, grid_width, total_makespan_limit, n, Agents, G = create_graph_from_instance()
-    makespan_limit = n
+    else:
+        grid_height, grid_width, total_makespan_limit, n, Agents, G = create_graph_from_instance()
+        makespan_limit = n
+        
     positions = {node: (node[0], node[1]) for node in G.nodes()}
 
     value_to_coord = {(initx * max(grid_height, grid_width)) + inity: (initx, inity) for initx, inity in G.nodes()}
@@ -600,6 +608,8 @@ if __name__ == "__main__":
                     else:
                         if makespan_for_step <= makespan_for_subproblem:
                             makespan_for_step = makespan_for_subproblem
+                            subproblem_cpu_times.append(cpu_time_for_subproblem)
+
                         break
                 print("slution:", s_solution)
                 last_elements = {key: value_to_coord[values[max(values.keys())]] for key, values in s_solution.items()}
@@ -670,6 +680,7 @@ if __name__ == "__main__":
 
     # Calculate the total time taken
     elapsed_time = end_time - start_time
+    print(subproblem_cpu_times)
     total_subproblem_time = sum(float(t[:-1]) if isinstance(t, str) and t.endswith('s') else float(t) for t in subproblem_cpu_times)
 
     print(f"The script took {elapsed_time:.2f} seconds to run.")
