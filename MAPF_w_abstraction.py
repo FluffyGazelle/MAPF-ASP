@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans
 import networkx as nx
 import os
 import time
+from generating_instance.create_graph_from_instance import create_graph_from_instance
 class Graphs():
 
     def parse_abstract_output(self, sol, num_agents):
@@ -415,12 +416,12 @@ if __name__ == "__main__":
     sys.stderr = logFile
     #READ AGENTS FROM FILE
     print("Hi, starting the program...")
-    total_makespan_limit = 34
-    n = 16 # Number of clusters
-    grid_size = (32, 32) 
-    makespan_limit = n
-    G = nx.grid_2d_graph(*grid_size)
-
+    #total_makespan_limit = 34
+    #n = 16 # Number of clusters
+    #grid_size = (32, 32) 
+    #makespan_limit = n
+    #G = nx.grid_2d_graph(*grid_size)
+    """
     with open(f"{grid_size[0]}x{grid_size[1]}_agents/256_agents_1.txt", "r") as file:
         agents = file.read()
         agents_list = agents.split("\n")
@@ -432,15 +433,17 @@ if __name__ == "__main__":
         Agents.append(paired_numbers) 
     print("agents:",Agents)       
     print("Generated the grid graph")
+    """
     
-      
-
+    grid_height, grid_width, total_makespan_limit, n, Agents, G = create_graph_from_instance()
+    makespan_limit = n
     positions = {node: (node[0], node[1]) for node in G.nodes()}
 
-    value_to_coord = {(initx * max(grid_size)) + inity: (initx, inity) for initx, inity in G.nodes()}
+    value_to_coord = {(initx * max(grid_height, grid_width)) + inity: (initx, inity) for initx, inity in G.nodes()}
     coord_to_value = {coord: value for value, coord in value_to_coord.items()}
 
     print("value to coord", coord_to_value)
+    
     
     subgraphs = Graphs.graph_partitioning(G, n)
 

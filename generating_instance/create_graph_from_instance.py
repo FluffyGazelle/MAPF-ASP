@@ -44,19 +44,20 @@ def create_graph_from_instance():
 
 
 # Example usage
-
-ms, cl, agents, G = create_graph_from_instance()
-# print("Nodes:", graph.nodes())
-
-
-print(len(G.nodes()))
-print("Nodes:", G.nodes())
-
-print("\n\n\n edges \n")
-print(G.edges())
+if __name__ == "__main__":
+        
+    ms, cl, agents, G = create_graph_from_instance()
+    # print("Nodes:", graph.nodes())
 
 
-print("Makespan:", ms)
-print("Clusters:", cl)
-# nx.draw(graph, with_labels=True, node_color='skyblue', node_size=100, edge_color='k', linewidths=1, font_size=1)
-# plt.show()
+    print(len(G.nodes()))
+    print("Nodes:", G.nodes())
+
+    print("\n\n\n edges \n")
+    print(G.edges())
+
+
+    print("Makespan:", ms)
+    print("Clusters:", cl)
+    # nx.draw(graph, with_labels=True, node_color='skyblue', node_size=100, edge_color='k', linewidths=1, font_size=1)
+    # plt.show()
