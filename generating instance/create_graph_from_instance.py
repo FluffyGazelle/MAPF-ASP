@@ -6,7 +6,7 @@ import sys
 def create_graph_from_instance():
     '''
     Creates a networkx graph from instance file.
-    It returns makespan, number of cluster, agent list and graph itself in this order.
+    It returns height, width, makespan, number of cluster, agent list and graph itself in this order.
 
     '''    
     instance = sys.argv[1]
@@ -40,7 +40,7 @@ def create_graph_from_instance():
             graph.remove_node((obs_h, obs_w))
 
 
-    return makespan,cluster_num, agent_list, graph
+    return height, width, makespan,cluster_num, agent_list, graph
 
 
 # Example usage
