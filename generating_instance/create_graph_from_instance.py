@@ -33,11 +33,14 @@ def create_graph_from_instance():
         
         obst_line = 4+agent_num
         obstacle_num = int(lines[obst_line].split()[1])
-        graph = nx.grid_2d_graph(height, width)
+        # graph = nx.grid_2d_graph(height, width)
+        graph = nx.grid_2d_graph(width, height)
         for line in lines[obst_line+1:]:
-            obs_h = int(line.split()[0])
-            obs_w = int(line.split()[1])
-            graph.remove_node((obs_h, obs_w))
+            # obs_h = int(line.split()[0])
+            obs_x = int(line.split()[0])
+            # obs_w = int(line.split()[1])
+            obs_y = int(line.split()[1])
+            graph.remove_node((obs_x, obs_y))
 
 
     return height, width, makespan,cluster_num, agent_list, graph

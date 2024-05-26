@@ -38,7 +38,8 @@ def create_instance():
         for line in lines[4:]:
             for h in range(width):
                 if line[h] != '.':
-                    obs_list.append((line_num, h))
+                    # obs_list.append((line_num, h))
+                    obs_list.append((h, line_num))
         
             line_num+= 1
     
