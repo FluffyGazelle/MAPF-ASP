@@ -27,8 +27,6 @@ plan(A,0,X) :- init(A,X), agent(A).
 % Define movements from X to Y at time T
 plan_to(X, Y, T, A) :- plan(A, T-1, X), plan(A, T, Y), edge(X, Y), time(T), agent(A).
 
-:- C{ plan_to(X, Y, T, A) ; plan_to(Y, X, T, A) : agent(A) }, edge(X, Y), edge_cap(X, Y, C-1), time(T).
-
 
 % Assign a unique door to each agent at each timestep   
 1{ assigned_door(A, T-1, L) : door(edge(X, Y), L) } 1 :- agent(A), plan(A, T-1, X), plan(A, T, Y), time(T),X != Y. 
