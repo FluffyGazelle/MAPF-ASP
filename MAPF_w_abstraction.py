@@ -18,7 +18,7 @@ class Graphs():
 
         if "UNSATISFIABLE" in sol:
             for line in sol:
-                if "CPU" in line and not cpu_found:
+                if "CPU" in line:
                     l = line.split()
                     print("cpu line",l)
                     cpu_time = l[-1]
@@ -89,7 +89,12 @@ class Graphs():
         
 
         if "UNSATISFIABLE" in sol:
-            return "UNSATISFIABLE", 0
+            for line in sol:
+                if "CPU" in line:
+                    l = line.split()
+                    print("cpu line",l)
+                    cpu_time = l[-1]
+                    return "UNSATISFIABLE", cpu_time
 
         plans = dict()
         planLengths = dict()
@@ -160,7 +165,7 @@ class Graphs():
 
         #Perform k-means clustering
         kmeans = KMeans(n_clusters=k, random_state=0).fit(data_points)
-
+        
         labels = kmeans.labels_
         for i, node in enumerate(G.nodes()):
             G.nodes[node]['cluster'] = labels[i]
@@ -168,8 +173,8 @@ class Graphs():
         
         """
         color_map = [f'C{G.nodes[node]["cluster"]}' for node in G.nodes()]
-        plt.figure(figsize=(15, 15))
-        nx.draw(G, pos=positions, node_color=color_map, with_labels=True, node_size= 100, font_weight='bold')
+        plt.figure(figsize=(8, 8))
+        nx.draw(G, pos=positions, node_color=color_map, with_labels=True, node_size= 250, font_weight='bold')
         plt.title('Graph Partitioning')
         plt.show()
         """
@@ -180,6 +185,8 @@ class Graphs():
             cluster_subgraph = G.subgraph([node for node in G.nodes() if G.nodes[node]['cluster'] == cluster_id])
             cluster_subgraph.graph = cluster_subgraph.graph.copy()
             cluster_subgraph.graph['label'] = cluster_id
+            is_connected = nx.is_connected(cluster_subgraph)
+            print("is connected", is_connected)
             subgraphs.append(cluster_subgraph)
         return subgraphs
 
@@ -235,7 +242,6 @@ class Graphs():
 
             # Add the modified subgraph to the list
             modified_subgraphs.append(H_i_prime)
-
         return modified_subgraphs
 
 
@@ -263,8 +269,7 @@ class Graphs():
                     print(H_j_prime.graph['label'], H_i_prime.graph['label'],"intersection", intersection)
                     if intersection:
                         G_A.add_edge(H_i_prime.graph['label'], H_j_prime.graph['label'], weight=len(intersection), doors = intersection) 
-                    edge_weights = nx.get_edge_attributes(G_A, 'weight')
-        return G_A, node_sizes, edge_weights
+        return G_A, node_sizes
 
     """
     Problem 4: ABSTRACT AGENT POSITIONING
@@ -272,17 +277,20 @@ class Graphs():
     def abstract_agent_positioning(Agents, subgraphs):
         A_A = []  # Abstract agents set
         for agent in Agents:
+            print("agent before abstractify", agent)
             initial_pos, goal_pos = agent
             initial_subgraph_idx = None
             goal_subgraph_idx = None
-            
             # Find which modified subgraph contains the initial and goal positions
             for i, H_i in enumerate(subgraphs):
-                if initial_pos in H_i:
+                print(H_i.nodes())
+                if initial_pos in H_i.nodes():
                     initial_subgraph_idx = i
-                if goal_pos in H_i:
+                if goal_pos in H_i.nodes():
                     goal_subgraph_idx = i
             
+            print("iiii",initial_pos, initial_subgraph_idx)
+            print(goal_pos, goal_subgraph_idx)
             # Ensure both positions are found in the subgraphs
             if initial_subgraph_idx is not None and goal_subgraph_idx is not None:
                 # Map to abstract graph nodes
@@ -321,7 +329,7 @@ class Graphs():
         return "".join(output_lines)
 
 
-    def generate_lp_files(self, modified_subgraphs, G_A_with_colors, node_capacities, edge_capacities, A_A, value_to_coord, makespan_limit):
+    def generate_lp_files(self, modified_subgraphs, G_A_with_colors, node_capacities, A_A, value_to_coord, makespan_limit):
         for i, mod_sub in enumerate(modified_subgraphs):
             node_value_list = []    
             for node in mod_sub.nodes():
@@ -392,10 +400,6 @@ class Graphs():
         with open("Abstract_Graph.lp", "a") as file:
             file.write(formatted_string+".\n")
             
-        formatted_string = ".".join([f"edge_cap({key[0]}, {key[1]}, {value})" for key, value in edge_capacities.items()])
-        with open("Abstract_Graph.lp", "a") as file:
-            file.write(formatted_string+".\n")
-            
             
         formatted_string = ".".join([f"agent({num})" for num in range(len(A_A))])
         with open(f"Abstract_Agents.lp", "w") as file:
@@ -410,7 +414,7 @@ class Graphs():
 
 if __name__ == "__main__":
     start_time = time.time()
-    debug = False
+    debug = True
     fileName = "output" + ".txt"
     # create log folder
     folderName = "log"
@@ -424,12 +428,13 @@ if __name__ == "__main__":
     print("Hi, starting the program...")
     if debug == True:
         total_makespan_limit = 34
-        n = 4 # Number of clusters
-        grid_size = (8, 8) 
+        n = 2 # Number of clusters
+        grid_size = (4, 8)
+        grid_height, grid_width = grid_size
         makespan_limit = n
         G = nx.grid_2d_graph(*grid_size)
         
-        with open(f"4x{grid_size[1]}_agents/5_agents_1.txt", "r") as file:
+        with open(f"4x8_agents/5_agents_1.txt", "r") as file:
             agents = file.read()
             agents_list = agents.split("\n")
             
@@ -439,12 +444,15 @@ if __name__ == "__main__":
             paired_numbers = ((numbers_list[0], numbers_list[1]), (numbers_list[2], numbers_list[3]))
             Agents.append(paired_numbers) 
         print("agents:",Agents)       
-        print("Generated the grid graph")
-    
+        
     else:
         grid_height, grid_width, total_makespan_limit, n, Agents, G = create_graph_from_instance()
         makespan_limit = n
         
+    print(Agents)
+    print("Generated the grid graph")
+    print(G.nodes())
+
     positions = {node: (node[0], node[1]) for node in G.nodes()}
 
     value_to_coord = {(initx * max(grid_height, grid_width)) + inity: (initx, inity) for initx, inity in G.nodes()}
@@ -477,14 +485,14 @@ if __name__ == "__main__":
 """
     
     # Generate the abstract graph with color
-    G_A_with_colors, node_capacities , edge_capacities = Graphs.abstract_graph_representation(modified_subgraphs, subgraph_colors)
+    G_A_with_colors, node_capacities = Graphs.abstract_graph_representation(modified_subgraphs, subgraph_colors)
 
     A_A = Graphs.abstract_agent_positioning(Agents, subgraphs)
     print("abstract agents:", A_A)
     pos=nx.circular_layout(G_A_with_colors)
     pos=nx.spring_layout(G_A_with_colors,dim=2,pos=pos)
 
-    """ 
+    """
     plt.figure(figsize=(10, 10))
     nx.draw(G_A_with_colors,
             with_labels=True,
@@ -498,7 +506,7 @@ if __name__ == "__main__":
     
     
     # Generating the mapf instance files
-    Graphs().generate_lp_files(modified_subgraphs, G_A_with_colors, node_capacities, edge_capacities, A_A, value_to_coord, makespan_limit)
+    Graphs().generate_lp_files(modified_subgraphs, G_A_with_colors, node_capacities, A_A, value_to_coord, makespan_limit)
 
     print("Running MAPF solver...")
     sol = Graphs.run_clingo_for_abstract_problem()
@@ -540,6 +548,7 @@ if __name__ == "__main__":
             for agent_key in Agents_dict.keys():
                 agent_value = Agents_dict[agent_key]
                 print(solution)
+                print("agent_key", agent_key, "agent_value", agent_value)
                 print("agent_solution", solution[agent_key], abstract_step)
                 
                 if solution[agent_key][abstract_step] == H_i_prime.graph['label']: #the agent is in the subgraph, add it to the subproblem containing the subgraph
@@ -592,7 +601,7 @@ if __name__ == "__main__":
                 with open(output_path, 'w') as file:
                     file.write(A_s_STR)
                 max_manhattan_distance = Graphs.get_max_manhattan_distance(H_i_prime) #subgraphın max manhattan distance'ı, subproblem içindeki maksimum agent goal init farkı da olabilir
-                makespan_for_subproblem = int(max_manhattan_distance*0.7)
+                makespan_for_subproblem = int(1)
                 while True:
                     with open("subproblem_limit.lp", "w") as file:
                         file.write(f"#const t = {makespan_for_subproblem}.\ntime(0..t).")
@@ -608,7 +617,7 @@ if __name__ == "__main__":
                     else:
                         if makespan_for_step <= makespan_for_subproblem:
                             makespan_for_step = makespan_for_subproblem
-                            subproblem_cpu_times.append(cpu_time_for_subproblem)
+                        subproblem_cpu_times.append(cpu_time_for_subproblem)
 
                         break
                 print("slution:", s_solution)
@@ -660,6 +669,7 @@ if __name__ == "__main__":
     longest_plan_agent = None
     max_length = 0
     #print("combined_plans", combined_plans)
+    print("-------------------\n\n\n")
     for agent_id, plan in combined_plans.items():
         print(f"\nAgent {agent_id} plan:")
         print(plan)
@@ -674,15 +684,16 @@ if __name__ == "__main__":
                         print(f"Conflict at step {step} between agents {agent_id} and {agent_id_to_compare}")
     
     if solution_valid:
-        print("Solution is valid!")
+        print("\nSolution is valid!")
         
     end_time = time.time()
 
     # Calculate the total time taken
     elapsed_time = end_time - start_time
-    print(subproblem_cpu_times)
+    #print(subproblem_cpu_times)
     total_subproblem_time = sum(float(t[:-1]) if isinstance(t, str) and t.endswith('s') else float(t) for t in subproblem_cpu_times)
 
+    print("Abstract plan:", solution)
     print(f"The script took {elapsed_time:.2f} seconds to run.")
     print(f"Abstract Problem solving time: {abs_cpu_time}")
     print("Amount of subproblems solved:", len(subproblem_cpu_times))
